@@ -1,0 +1,52 @@
+# LP System - PHP shared-hosting edition
+# Front-controller routing + security headers for the public/ document root.
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Allow the installer to be reached directly (it has its own
+    # index.php / lock check) before the catch-all rewrite below.
+    RewriteCond %{REQUEST_URI} ^/install/ [NC]
+    RewriteRule ^ - [L]
+
+    # Serve real files/directories (assets, uploads) directly.
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Everything else goes through the front controller.
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+# Never serve directory listings.
+Options -Indexes
+
+# Security headers (defense in depth; see SECURITY.md).
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Never execute scripts inside the uploads directory, even if one is
+# somehow placed there (defense in depth on top of server-side upload
+# validation in app/Services/UploadService.php).
+<FilesMatch "\.(php|php\d|phtml|pl|py|cgi|sh)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+<Files "index.php">
+    <IfModule mod_authz_core.c>
+        Require all granted
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Allow from all
+    </IfModule>
+</Files>

@@ -1,0 +1,12 @@
+# Generated at install time — never commit, never ship in a release ZIP.
+config/config.php
+storage/install.lock
+storage/logs/*.log
+storage/cache/*
+!storage/cache/.gitkeep
+storage/private-uploads/*
+!storage/private-uploads/.gitkeep
+public/uploads/*
+!public/uploads/.gitkeep
+vendor/
+.env

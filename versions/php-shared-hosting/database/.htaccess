@@ -1,0 +1,10 @@
+# Defense in depth: this directory must never be reachable over HTTP even
+# if the document root is ever misconfigured to the project root instead
+# of public/. Deny everything, unconditionally.
+<IfModule mod_authz_core.c>
+  Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+  Order allow,deny
+  Deny from all
+</IfModule>
