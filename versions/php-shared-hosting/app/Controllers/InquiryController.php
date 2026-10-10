@@ -56,9 +56,9 @@ final class InquiryController
             'customer_id' => $customerId,
             'description' => $description,
             'desired_product' => $desiredProduct,
-            'service_id' => $_POST['service_id'] ?: null,
-            'rough_qty' => $_POST['rough_qty'] ?: null,
-            'rough_qty_unit' => $_POST['rough_qty_unit'] ?: null,
+            'service_id' => ($_POST['service_id'] ?? '') ?: null,
+            'rough_qty' => ($_POST['rough_qty'] ?? '') ?: null,
+            'rough_qty_unit' => ($_POST['rough_qty_unit'] ?? '') ?: null,
         ]);
 
         AuditService::log($user['id'], 'INQUIRY_CREATED', 'Inquiry', $id);

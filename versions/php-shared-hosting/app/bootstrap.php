@@ -45,8 +45,13 @@ function app_config(): array
     }
     $file = APP_ROOT . '/config/config.php';
     if (!is_file($file)) {
-        // No config yet — every entry point except the installer must stop here.
+        // No config yet — send browsers to the installer; every other entry
+        // point (CLI scripts) just stops with a message.
         if (!defined('LP_INSTALLER_CONTEXT')) {
+            if (PHP_SAPI !== 'cli' && !headers_sent()) {
+                header('Location: /install/');
+                exit;
+            }
             http_response_code(503);
             echo 'LP System is not installed yet. Visit /install/ to set it up.';
             exit;

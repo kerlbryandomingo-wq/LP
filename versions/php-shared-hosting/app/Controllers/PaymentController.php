@@ -62,9 +62,9 @@ final class PaymentController
             'method' => $_POST['method'] ?? 'CASH',
             'proof_file_path' => $proofPath,
             'status' => 'PENDING',
-            'reference_number' => $_POST['reference_number'] ?: null,
+            'reference_number' => ($_POST['reference_number'] ?? '') ?: null,
             'recorded_by_id' => $user['id'],
-            'notes' => $_POST['notes'] ?: null,
+            'notes' => ($_POST['notes'] ?? '') ?: null,
         ]);
 
         AuditService::log($user['id'], 'PAYMENT_RECORDED', 'Payment', $id, ['order_id' => $orderId, 'amount' => $amount]);

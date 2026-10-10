@@ -153,7 +153,7 @@ final class JobOrderController
             'jo' => $params['id'],
             'label' => $label,
             'outcome' => $outcome,
-            'notes' => $_POST['notes'] ?: null,
+            'notes' => ($_POST['notes'] ?? '') ?: null,
             'uid' => $user['id'],
         ]);
 

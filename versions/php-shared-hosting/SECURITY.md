@@ -12,7 +12,9 @@
 - **CSRF**: every state-changing (POST) request requires a per-session
   token (`App\Helpers\Csrf`), verified server-side before any database
   write. A POST missing or mismatching the token is rejected with HTTP
-  419 before any business logic runs. Verified live.
+  403 before any business logic runs. Verified live over Apache, with the
+  database row count checked before and after. (An earlier build used the
+  non-standard 419 code, which Apache turns into a 500 — see TESTING.md.)
 - **Session security**: `HttpOnly` always; `Secure` automatically enabled
   when the installer detects HTTPS; `SameSite=Lax`; session ID
   regenerated on every successful login (fixation protection); idle
@@ -30,8 +32,8 @@
   logged-out request to any protected page redirects to `/login`;
   verified live for the dashboard and the protected-file download route.
 - **Private file protection**: payment proofs and other uploaded
-  documents are stored in `storage/private-uploads/`, entirely outside
-  the public document root, with no static URL that reaches them. The
+  documents are stored in `storage/private-uploads/`, outside `public/`,
+  with no static URL that reaches them. The
   only path in is `App\Controllers\UploadController::download()`, which
   requires an authenticated session. **Known gap**: this release checks
   "is logged in," not yet "does this specific customer own the order
@@ -48,12 +50,19 @@
   landed in `public/uploads/`, Apache refuses to execute it. **Verified
   live**: a `.php` file placed in `public/uploads/` returns HTTP 403, not
   execution output (see TESTING.md).
-- **Config/secrets never web-reachable**: `config/`, `storage/`,
-  `database/`, and `app/` each carry their own deny-all `.htaccess`, on
-  top of simply not living under the document root (`public/`) in the
-  recommended layout. **Verified live** over real Apache: both
-  `config/config.php` and `storage/logs/*.log` return 404 when requested
-  directly.
+- **Config/secrets never web-reachable**: when the package is extracted
+  straight into `public_html/`, the root `.htaccess` rewrites every request
+  into `public/`, so nothing outside `public/` can be fetched by URL.
+  `config/`, `storage/`, `database/`, and `app/` additionally carry their
+  own deny-all `.htaccess`, and the root `.htaccess` denies `.md`, `.sql`,
+  `.sh`, `.json`, `.lock`, `.log` files outright. Inside `public/`, every
+  `.php` file except `index.php` is denied, so the installer's internal
+  step/layout files can't be requested directly either. **Verified live**
+  over real Apache with this exact layout: 20 sensitive paths (including
+  `config/config.php` holding real DB credentials, logs, source files, SQL,
+  test scripts, docs, `.htaccess`, and a `public/../config/config.php`
+  traversal attempts) all returned 403 or 404 with no file content in
+  the response (TESTING.md section 6).
 - **No stack traces / SQL errors shown to users**: `display_errors` is
   forced off in `app/bootstrap.php`; all errors go to
   `storage/logs/php-error.log` and `storage/logs/app.log` instead.
@@ -96,17 +105,25 @@ edit `config/config.php`'s `session.secure_cookie` to `true` by hand.
 
 ## Non-Apache hosts (nginx)
 
-If your host uses nginx without an Apache-compatibility layer, ask them to
-apply these three rules (nginx doesn't read `.htaccess`):
+If your host uses nginx without an Apache-compatibility layer, nginx ignores
+`.htaccess`. Ask the host to set the site's document root to the `public/`
+folder and apply these rules (not tested in this release — no nginx server
+was available):
 
 ```nginx
+root /path/to/public_html/public;
+index index.php;
+
 location / {
     try_files $uri $uri/ /index.php?$query_string;
 }
-location ~* /uploads/.*\.(php|phtml)$ {
-    deny all;
+# Only index.php may execute; everything else .php under public/ is denied.
+location ~ ^/(index\.php|install/index\.php)$ {
+    include fastcgi_params;
+    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+    fastcgi_pass unix:/run/php/php-fpm.sock;   # host-specific
 }
-location ~ ^/(config|storage|database|app)/ {
+location ~ \.php$ {
     deny all;
 }
 ```

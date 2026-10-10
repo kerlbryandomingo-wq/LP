@@ -1,0 +1,35 @@
+# LP System - root entry point for hosts where the whole package is
+# extracted straight into public_html/ (the usual case on cPanel / Z.com
+# Starter shared hosting, where the document root can't be changed).
+#
+# Every request is internally rewritten into public/, so:
+#   - the app and installer work at https://yourdomain.com/ and /install/
+#   - app/, config/, database/, storage/, tests/ and the *.md docs are never
+#     served directly (a request for /config/config.php becomes
+#     public/config/config.php, which doesn't exist, so the app returns 404)
+#
+# If your host CAN point the document root at public/, do that instead;
+# this file is then simply never used.
+
+DirectoryIndex index.php
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Already inside public/? Leave it to public/.htaccess.
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# Second layer, in case mod_rewrite is off: block files that must never be
+# downloadable from the web root.
+<FilesMatch "(\.(md|sql|sh|json|lock|log|ini)|^\.gitignore|^\.gitkeep)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>

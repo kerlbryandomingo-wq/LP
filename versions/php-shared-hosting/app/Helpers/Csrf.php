@@ -29,12 +29,16 @@ final class Csrf
         return hash_equals($_SESSION['_csrf'], $token);
     }
 
-    /** Call at the top of every POST handler; exits with 419 on failure. */
+    /**
+     * Call at the top of every POST handler; exits with 403 on failure.
+     * Deliberately not 419: Apache (and so most shared hosts) doesn't
+     * recognise that non-standard code and turns it into a 500.
+     */
     public static function requireValid(): void
     {
         $token = $_POST['_csrf'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? null);
         if (!self::verify($token)) {
-            http_response_code(419);
+            http_response_code(403);
             Logger::warning('CSRF token mismatch on ' . ($_SERVER['REQUEST_URI'] ?? ''));
             echo 'Your session has expired or this request could not be verified. Please go back, refresh the page, and try again.';
             exit;

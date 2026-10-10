@@ -6,37 +6,45 @@
   on it. Most cPanel hosts: "MySQL Databases" → create database → create
   user → "Add User to Database" with ALL PRIVILEGES.
 - Know your database host (almost always `localhost` on shared hosting).
-- Have the folder uploaded (via File Manager's upload+extract, or FTP) so
-  that your domain's document root points at this folder's `public/`
-  subdirectory, or follow "Single-folder hosts" below if your host can't
-  do that.
+- The site must be installed at the root of a domain or subdomain, not in a
+  subfolder like `yourdomain.com/lp/`.
 
-## Single-folder hosts
+## Uploading the files
 
-If your host forces the document root to be exactly `public_html/` (or
-similar) with no way to point it at a subdirectory:
+1. cPanel → **File Manager** → open `public_html/` (or the folder your
+   subdomain points to). It should be empty, apart from anything your host
+   put there by default, such as `cgi-bin/`. Remove any placeholder
+   `index.html`, which would otherwise be shown instead of the app.
+2. Click **Upload**, choose `LP-System-PHP-Shared-Hosting.zip`, wait for it
+   to finish, then go back to `public_html/`.
+3. Right-click the ZIP → **Extract** → extract into `public_html/` itself.
+4. Check the result. Directly inside `public_html/` you should see
+   `index.php`, `public/`, `app/`, `config/`, `database/`, `storage/`,
+   `tests/` and the `.md` documents. The `.htaccess` files are hidden by
+   default — turn on File Manager → Settings → **Show Hidden Files
+   (dotfiles)** to see them. If instead you see a single extra folder that
+   contains all of this, you extracted into a subfolder: move its contents
+   up into `public_html/`.
+5. Delete the ZIP from `public_html/`.
 
-1. Upload this release's `public/` folder's **contents** (not the folder
-   itself) directly into `public_html/`.
-2. Upload `app/`, `config/`, `database/`, `storage/` as siblings **one
-   level above** `public_html/`, if your hosting account's file structure
-   allows a level above the web root (cPanel accounts usually have a
-   home directory containing `public_html/` alongside other folders —
-   put them there).
-3. If your account truly has no directory above the web root at all,
-   upload `app/`, `config/`, `database/`, `storage/` INSIDE `public_html/`
-   as normal sibling folders of the files you just uploaded in step 1.
-   This is less ideal (they're technically inside the web root) but the
-   `.htaccess` deny-all files inside each of those folders still fully
-   block HTTP access to them — verified in this release's testing (see
-   TESTING.md). Either way, after extracting, edit nothing: the installer
-   finds these folders relative to its own location automatically.
+Do not move or rename any of the folders — the app finds them relative to
+each other. The root `.htaccess` makes sure only `public/` is ever served;
+everything else returns "Forbidden" even though it sits inside
+`public_html/`.
+
+FTP works the same way: extract the ZIP on your computer and upload its
+contents (including the hidden `.htaccess` files) into `public_html/`.
+
+**If your host lets you set a custom document root** (common for addon
+domains/subdomains), you may point it at the `public/` folder instead. That
+works too; nothing else changes.
 
 ## The wizard
 
 1. **Welcome** — confirms you're ready; nothing is changed yet.
-2. **Requirements Check** — verifies PHP version, required extensions, and
-   that `config/`, `storage/`, and `public/uploads/` are writable. A "FAIL"
+2. **Requirements Check** — verifies PHP version, required extensions,
+   Apache `mod_rewrite` (where PHP can detect it), and that `config/`,
+   `storage/`, and `public/uploads/` are writable. A "FAIL"
    here almost always means a folder permission — set it to `755` (or
    `775` if your host requires group-writable) via File Manager's
    "Permissions" option, then reload the page.
@@ -69,6 +77,9 @@ similar) with no way to point it at a subdirectory:
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
+| Your domain shows a folder listing, your host's default page, or a "LP-System-…" folder instead of the installer | The ZIP was extracted into a subfolder, or a default `index.html` is still there | Make sure `index.php` sits directly in `public_html/` (see "Uploading the files") and delete any `index.html` |
+| The home page loads but `/install/`, `/login` or the CSS give "Not Found" | The `.htaccess` files are missing (hidden files weren't uploaded) or the host has URL rewriting turned off | Turn on "Show Hidden Files" and confirm `public_html/.htaccess` and `public_html/public/.htaccess` exist; if they do, ask your host to enable `mod_rewrite` / `.htaccess` overrides |
+| Pages work but have no styling and links point to the wrong place | The site was installed in a subfolder (`yourdomain.com/lp/`) | Install at the root of a domain or a subdomain instead |
 | Requirements check fails on a folder | Wrong permissions | Set the folder to 755 via File Manager |
 | "Could not connect" on the database step | Wrong host/user/password, or the DB user lacks privileges | Double-check cPanel → MySQL Databases; re-grant ALL PRIVILEGES |
 | Blank white page anywhere | A PHP fatal error occurred and was logged, not shown (by design — see SECURITY.md) | Check `storage/logs/php-error.log` and `storage/logs/app.log` via File Manager |

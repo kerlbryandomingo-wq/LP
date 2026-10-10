@@ -10,83 +10,78 @@ is a separate, independently deployable codebase under
 `versions/php-shared-hosting/`.
 
 Read **FEATURE-PARITY.md** before relying on this for production — it lists
-exactly what has been ported and tested, and what has not, honestly.
+exactly what has been ported and tested, and what has not.
 
 ## Requirements
 
 - PHP 8.0 or newer (tested on 8.3) with these extensions: `pdo_mysql`,
-  `mbstring`, `json`, `fileinfo`, `session`. `gd` is optional (only used if
-  you later add image resizing).
+  `mbstring`, `json`, `fileinfo`, `session`. `gd` is optional.
 - MySQL 5.7+ or MariaDB 10.3+ (InnoDB).
-- Apache with `mod_rewrite` and `mod_headers` (or an equivalent on
-  LiteSpeed/nginx — see "Non-Apache hosts" below).
-- No Composer, no `vendor/` directory, and no shell access are required to
-  run the app — everything needed ships in this folder. Composer is
-  supported but optional (see `composer.json` — there are zero required
-  third-party packages).
+- Apache with `mod_rewrite` (standard on cPanel hosts) or LiteSpeed, which
+  reads the same `.htaccess` files. nginx needs the rules in SECURITY.md.
+- The site must live at the **root of a domain or subdomain**
+  (`https://yourdomain.com/` or `https://lp.yourdomain.com/`), not in a
+  subfolder such as `https://yourdomain.com/lp/` — the app's links and
+  redirects are root-relative.
+- No Composer, no `vendor/` directory, no shell access. There are zero
+  third-party packages.
 
-## Directory layout
+## What's in the ZIP
+
+The ZIP's files sit directly at its root — extract it straight into your web
+root (`public_html/`) and `index.php` lands where your host expects it:
 
 ```
-php-shared-hosting/
-├── public/            <- Point your domain's document root HERE
-│   ├── index.php      <- Front controller
-│   ├── install/       <- Browser installer (self-locking after use)
-│   ├── assets/        <- CSS/JS/images
-│   └── uploads/       <- Public, non-sensitive files only
-├── app/               <- PHP source (Controllers/Models/Services/Views) — keep OUTSIDE the public document root
-├── config/            <- config.php is generated here by the installer — keep OUTSIDE the public document root
-├── database/          <- SQL migrations + seed data
-├── storage/            <- logs/, cache/, private-uploads/ — keep OUTSIDE the public document root
-└── tests/
+public_html/                 <- extract the ZIP here
+├── index.php                <- entry point
+├── .htaccess                <- routes every request into public/, blocks everything else
+├── public/                  <- the actual web-facing part
+│   ├── index.php            <- front controller
+│   ├── install/             <- browser installer (locks itself after use)
+│   ├── assets/              <- CSS / JS
+│   └── uploads/             <- public, non-sensitive files only
+├── app/                     <- PHP source — never served directly
+├── config/                  <- config.php is written here by the installer — never served directly
+├── database/                <- SQL migrations + seed data — never served directly
+├── storage/                 <- logs, cache, private uploads — never served directly
+├── tests/                   <- test scripts — never served directly
+└── *.md                     <- documentation — never served directly
 ```
 
-**If your host only gives you one folder (e.g. `public_html/`) and will not
-let you point it at a subdirectory:** upload the entire `php-shared-hosting/`
-contents into `public_html/`, then rename `public_html/public/` by MOVING its
-contents up one level AND keeping `app/`, `config/`, `database/`, `storage/`
-as siblings of `public_html/`'s new contents, one level ABOVE the web root if
-at all possible. The `.htaccess` files in `config/`, `storage/`, `database/`,
-and `app/` deny-all as a second layer of defense either way, but the real
-protection is these folders not being under the web root at all. See
-INSTALL.md's "Single-folder hosts" section for the exact steps.
+Every request is internally rewritten into `public/`, so `app/`, `config/`,
+`database/`, `storage/`, `tests/` and the docs can't be downloaded even
+though they sit inside `public_html/` (verified on a real Apache server —
+see TESTING.md section 6). Each of those folders also has its own deny-all
+`.htaccess` as a second layer.
+
+**If your host lets you choose the document root**, you can instead point it
+at the `public/` folder; the root `index.php` and `.htaccess` are then
+simply unused. Both setups were tested.
 
 ## Quick start (cPanel)
 
-1. In cPanel → "MySQL Databases," create a database and a user with full
-   privileges on it. Note the host (usually `localhost`), database name,
-   username, and password.
-2. Upload this entire `php-shared-hosting/` folder's contents via File
-   Manager or FTP. If your host supports subdomains/addon domains with a
-   custom document root, point it at this folder's `public/` subdirectory.
-   Otherwise see the single-folder note above.
-3. Visit your domain in a browser. You'll land on `/install/` automatically
-   until installation is complete (the app itself returns a friendly
-   "not installed yet" message with a link there).
-4. Follow the 6-step wizard: requirements check → database credentials →
-   create tables → create your admin account → site settings → finish.
-5. The installer locks itself (`storage/install.lock`) once done. As a
-   further precaution, delete or rename `public/install/` entirely — see
-   INSTALL.md.
-
-## Non-Apache hosts (LiteSpeed / nginx)
-
-LiteSpeed reads `.htaccess` natively — no changes needed. For nginx, there
-is no `.htaccess` equivalent; ask your host to apply the same three rules
-`public/.htaccess` encodes: (1) route all non-file requests to
-`index.php`, (2) deny execution of `.php` files under `uploads/`, (3) deny
-all access to `config/`, `storage/`, `database/`, `app/`. A sample nginx
-block is in `docs/nginx-example.conf`-equivalent guidance inside
-SECURITY.md.
+1. In cPanel → **MySQL Databases**, create a database and a user, and add
+   the user to the database with **ALL PRIVILEGES**. Note the database
+   name, username and password (the host is almost always `localhost`).
+2. In cPanel → **File Manager**, open `public_html/`, upload
+   `LP-System-PHP-Shared-Hosting.zip`, right-click it → **Extract**. You
+   should now see `index.php`, `public/`, `app/` etc. directly inside
+   `public_html/`. (Turn on "Show Hidden Files" in File Manager settings to
+   see the `.htaccess` files.) You can delete the ZIP afterwards.
+3. Visit your domain. A fresh install redirects you to `/install/`
+   automatically.
+4. Follow the wizard: requirements check → database credentials → create
+   tables → admin account → site settings → finish.
+5. The installer locks itself (`storage/install.lock`). As an extra
+   precaution you can then delete `public/install/` — see INSTALL.md.
 
 ## Support documents
 
 - **INSTALL.md** — detailed installer walkthrough + troubleshooting.
 - **UPGRADE.md** — how to update to a newer release without data loss.
 - **BACKUP.md** — what to back up and how to restore it.
-- **SECURITY.md** — the security model, what's protected and how, and
-  hosting-specific hardening notes.
-- **FEATURE-PARITY.md** — the honest checklist: what's implemented and
-  tested, what's a documented gap, and why.
+- **SECURITY.md** — the security model and hosting-specific notes
+  (including nginx rules).
+- **FEATURE-PARITY.md** — what's implemented and tested, what isn't, and why.
 - **TESTING.md** — exactly what was tested in this release, how, and the
   results.

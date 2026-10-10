@@ -23,8 +23,12 @@ hosting where you may not have shell access.
      reappear)
    - `storage/private-uploads/`, `public/uploads/` (your real uploaded
      files — never overwrite these with the empty ones from the release)
-3. Copy the new release's `app/`, `public/assets/`, `public/index.php`,
-   `public/.htaccess`, and `database/migrations/` over the old ones.
+3. Copy the new release's `app/`, `public/assets/`, `public/install/`
+   (skip it if you deleted it after installing), `public/index.php`,
+   `public/.htaccess`, the root `index.php` and root `.htaccess`, the
+   `.htaccess` files inside `config/`, `storage/`, `database/`, and
+   `database/migrations/` over the old ones. Make sure hidden files are
+   included — in cPanel File Manager turn on "Show Hidden Files."
 4. **Run any new migration files.** Check `database/migrations/` for
    files numbered higher than the last one you applied (e.g. if you're on
    `003_...sql` and the new release includes `004_...sql`, run only

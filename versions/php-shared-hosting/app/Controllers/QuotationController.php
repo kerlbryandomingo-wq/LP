@@ -59,9 +59,9 @@ final class QuotationController
             }
             $items[] = [
                 'description' => $desc,
-                'service_id' => $serviceIds[$i] ?: null,
+                'service_id' => ($serviceIds[$i] ?? '') ?: null,
                 'qty' => max(1, (int) ($qtys[$i] ?? 1)),
-                'unit' => $units[$i] ?: null,
+                'unit' => ($units[$i] ?? '') ?: null,
                 'unit_price' => max(0.0, (float) ($prices[$i] ?? 0)),
             ];
         }
@@ -107,11 +107,11 @@ final class QuotationController
                  VALUES (:id, :inquiry_id, :customer_id, :quote_number, :status, :valid_until, :subtotal, :discount_type, :discount_value, :discount_amount, :discount_label, :tax_pct, :tax_amount, :total, :notes, :created_by_id)'
             )->execute([
                 'id' => $id,
-                'inquiry_id' => $_POST['inquiry_id'] ?: null,
+                'inquiry_id' => ($_POST['inquiry_id'] ?? '') ?: null,
                 'customer_id' => $customerId,
                 'quote_number' => $quoteNumber,
                 'status' => 'DRAFT',
-                'valid_until' => $_POST['valid_until'] ?: null,
+                'valid_until' => ($_POST['valid_until'] ?? '') ?: null,
                 'subtotal' => $totals['subtotal'],
                 'discount_type' => $totals['discountType'],
                 'discount_value' => $totals['discountValue'],
@@ -120,7 +120,7 @@ final class QuotationController
                 'tax_pct' => $totals['taxPct'],
                 'tax_amount' => $totals['taxAmount'],
                 'total' => $totals['total'],
-                'notes' => $_POST['notes'] ?: null,
+                'notes' => ($_POST['notes'] ?? '') ?: null,
                 'created_by_id' => $user['id'],
             ]);
 

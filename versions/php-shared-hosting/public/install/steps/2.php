@@ -6,6 +6,15 @@ foreach (['pdo_mysql', 'mbstring', 'json', 'fileinfo', 'session'] as $ext) {
 }
 $checks[] = ['label' => 'gd extension (optional, for image handling)', 'ok' => extension_loaded('gd'), 'detail' => extension_loaded('gd') ? 'loaded' : 'not available — image resizing will be skipped', 'optional' => true];
 
+// URL rewriting is required (the root .htaccess routes everything into
+// public/). On Apache+mod_php it can be detected directly; on LiteSpeed /
+// PHP-FPM it can't, but reaching this page through /install/ already proves
+// rewriting works there.
+if (function_exists('apache_get_modules')) {
+    $rewriteOn = in_array('mod_rewrite', apache_get_modules(), true);
+    $checks[] = ['label' => 'Apache mod_rewrite', 'ok' => $rewriteOn, 'detail' => $rewriteOn ? 'enabled' : 'NOT enabled — ask your host to enable mod_rewrite / .htaccess overrides'];
+}
+
 $root = dirname(__DIR__, 3);
 foreach (['config', 'storage', 'storage/logs', 'storage/private-uploads', 'public/uploads'] as $dir) {
     $path = $root . '/' . $dir;

@@ -16,9 +16,11 @@ preserved across steps, matching real browser behavior):
   correct and (separately, not shown here) deliberately wrong credentials
   — wrong credentials correctly surfaced the real PDO error message
   rather than a generic failure.
-- Create Database Tables: **all 20 tables created** (18 core tables + 1
-  sequence table + the seed data's effect on 2 of those tables), verified
-  via `SHOW TABLES`.
+- Create Database Tables: **all 19 tables created** (18 from the initial
+  schema + the `number_sequences` table), plus seed rows in
+  `business_settings`, `workflow_templates` and `workflow_stages`, verified
+  via `SHOW TABLES`. (An earlier version of this document said "20" — a
+  counting mistake, corrected.)
   - **Bug found and fixed during this testing**: the first attempt failed
     with a SQL syntax error, because the naive `explode(';', $sql)`
     statement-splitter in the installer broke on a semicolon that
@@ -79,7 +81,7 @@ Single continuous session, scripted:
 |---|---|---|
 | Unauthenticated access to a protected page | `GET /dashboard` with no session cookie | HTTP 302 → `/login` ✅ |
 | Unauthenticated access to a protected file download | `GET /files/{id}` with no session cookie | HTTP 302 → `/login` ✅ |
-| CSRF — POST without a token | `POST /customers` with no `_csrf` field | HTTP 419, request rejected before any DB write ✅ |
+| CSRF — POST without a token | `POST /customers` with no `_csrf` field | Rejected before any DB write ✅. Originally returned 419; under Apache that became a 500 and was changed to 403 — see section 6 |
 | SQL injection — classic `' OR '1'='1` in the login email field | Logged-out session, real POST to `/login` | Rejected with "Invalid email or password." `users` table row count unchanged (still 1) ✅ |
 | SQL injection — `'; DROP TABLE users; --` in the login email field | Same | Rejected the same way; `users` table still exists and intact afterward ✅ |
 | Login throttling | 6 consecutive wrong passwords, same email, same session | Attempts 1-5: "Invalid email or password." Attempt 6: "Too many failed attempts. Please wait a few minutes and try again." ✅ |
@@ -141,3 +143,70 @@ the development sandbox and configured a VirtualHost pointing at
 - **Data migration from a real PostgreSQL database** was not tested —
   no migration script exists yet (see FEATURE-PARITY.md's migration
   procedure section).
+
+## 6. Release 2 — "extract straight into public_html" layout (real Apache)
+
+**Why this round happened:** the first release ZIP wrapped everything in an
+`LP-System-PHP-Shared-Hosting/` folder and only had an `index.php` inside
+`public/`. That required pointing the domain's document root at `public/`,
+which most cPanel / starter shared-hosting accounts can't do — extracted
+into `public_html/`, there was no `index.php` at the web root. This was
+reported by the user and is a packaging design flaw, now fixed:
+
+- The ZIP's files now sit at the ZIP root (no wrapper folder).
+- A root `index.php` and root `.htaccess` were added; the `.htaccess`
+  rewrites every request into `public/`.
+- A fresh, not-yet-installed site now redirects to `/install/` (previously
+  it only printed a message).
+- The installer's requirements step now checks Apache `mod_rewrite` when
+  PHP can detect it.
+
+**Setup:** the release ZIP was extracted with `unzip` into an empty
+directory owned by the web-server user, and real Apache 2.4 + mod_rewrite +
+mod_headers + mod_php 8.3 was configured with that directory as the
+document root, mirroring `public_html/` on a cPanel account. MariaDB 10.11,
+fresh empty database.
+
+**Results:**
+
+| Check | Result |
+|---|---|
+| `GET /` on a fresh install | 302 → `/install/` ✅ |
+| Installer, all 6 steps | Requirements 13/13 green (incl. mod_rewrite); every step advanced; "Installation Complete"; `config/config.php` and `storage/install.lock` written ✅ |
+| `/install/` after install | 403 "already installed" ✅ |
+| Workflow script part 1 (login → customer → inquiry → quotation → approve → order) | All steps passed; quotation total ₱1,008.00 as expected ✅ |
+| Workflow script part 2 (job order → payment gate → partial payment → confirm → advance → QC) | All steps passed; gate message and ₱504.00 balance as expected ✅ |
+| CSS / JS assets | 200, correct content types ✅ |
+| `/no-such-page` | 404 ✅ |
+| SQL injection payloads on login (logged-out session) | Rejected; `users` table intact ✅ |
+| Login throttling | Attempts 1–5 "Invalid", attempt 6 "Too many failed attempts" ✅ |
+| `.php` file planted in `public/uploads/` | 403, not executed ✅ |
+| Security headers | Present ✅ |
+| 20 sensitive paths: `/config/config.php`, `/config/config.sample.php`, `/config/`, `/storage/install.lock`, `/storage/logs/app.log`, `/storage/logs/php-error.log`, `/app/bootstrap.php`, `/app/Services/AuthService.php`, `/database/migrations/001_initial_schema.sql`, `/tests/03_security.sh`, `/README-DEPLOYMENT.md`, `/composer.json`, `/.htaccess`, `/.gitignore`, `/public/../config/config.php`, `/public/install/steps/2.php`, `/install/steps/5.php`, `/install/layout_top.php`, `/index.php/../config/config.php`, `/public/index.php/../../config/config.php` | All 403/404, zero file content in any response ✅ |
+| Same install served with document root = `public/` (the other supported layout) | Login, assets, auth redirect, installer lock all correct; `/config/config.php` 404 ✅ |
+
+**Final re-run on the exact released ZIP:** after the fixes below, the final
+ZIP was extracted into a wiped directory with a wiped database and every
+check above was repeated: installer (including a deliberate wrong DB
+password, which showed the real "Access denied" error and let the user
+retry), both workflow scripts, logged-in CSRF forgery (403, row count
+unchanged), and all 20 sensitive paths. All passed, with zero PHP warnings
+logged.
+
+**Bugs found in this round and fixed:**
+
+1. **CSRF rejection returned 500 under Apache.** The guard worked (nothing
+   was written, the mismatch was logged), but it answered with status 419,
+   which Apache doesn't recognise and turns into a 500. PHP's built-in
+   server passes 419 through, which is why sections 3/4 didn't catch it.
+   Changed to 403; re-tested as a logged-in user: 403, customer row count
+   unchanged.
+2. **PHP "Undefined array key" warnings** in the error log when optional
+   form fields (service, notes, valid-until, etc.) weren't submitted. Nine
+   reads in four controllers, plus two line-item array reads, fixed. After
+   the fix, both workflow scripts ran with **zero** new PHP warnings.
+
+**Still not tested:** a real cPanel / Z.com account (only an equivalent
+Apache configuration), LiteSpeed, nginx, and the File Manager's own
+"Extract" feature (the ZIP was extracted with `unzip`; it's a standard
+deflate ZIP with no special features, but File Manager itself wasn't run).

@@ -1,4 +1,9 @@
 #!/bin/bash
+# Credentials for the admin account you created with the installer on
+# your OWN test install — never real production credentials. Override
+# via environment variables: TEST_ADMIN_EMAIL=... TEST_ADMIN_PASSWORD=...
+TEST_ADMIN_EMAIL="${TEST_ADMIN_EMAIL:-admin@example.test}"
+TEST_ADMIN_PASSWORD="${TEST_ADMIN_PASSWORD:-change-this-test-password}"
 set -e
 JAR=./tests/tmp/cookies2.txt
 OUT=./tests/tmp
@@ -14,7 +19,7 @@ echo "csrf=$TOKEN"
 
 echo "=== 2. POST /login (correct creds) ==="
 curl -s -c "$JAR" -b "$JAR" -X POST "$BASE/login" \
-  -d "_csrf=$TOKEN" -d "email=admin@lp-test.local" -d "password=SuperSecret123" \
+  -d "_csrf=$TOKEN" -d "email=$TEST_ADMIN_EMAIL" -d "password=$TEST_ADMIN_PASSWORD" \
   -o "$OUT/t2.html" -w "HTTP:%{http_code}\n" -D "$OUT/t2.headers"
 grep -i "^location" "$OUT/t2.headers" || true
 

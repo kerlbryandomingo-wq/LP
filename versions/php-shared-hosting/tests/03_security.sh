@@ -1,4 +1,9 @@
 #!/bin/bash
+# Credentials for the admin account you created with the installer on
+# your OWN test install — never real production credentials. Override
+# via environment variables: TEST_ADMIN_EMAIL=... TEST_ADMIN_PASSWORD=...
+TEST_ADMIN_EMAIL="${TEST_ADMIN_EMAIL:-admin@example.test}"
+TEST_ADMIN_PASSWORD="${TEST_ADMIN_PASSWORD:-change-this-test-password}"
 JAR=./tests/tmp/cookies2.txt
 BASE=http://127.0.0.1:8900
 
@@ -14,7 +19,7 @@ echo "=== C. SQL injection attempt in login email ==="
 curl -s -c "$JAR" -b "$JAR" "$BASE/login" -o ./tests/tmp/sec_c0.html
 TOKEN=$(grep -o 'name="_csrf" value="[^"]*"' ./tests/tmp/sec_c0.html | head -1 | sed -E 's/.*value="([^"]*)".*/\1/')
 curl -s -c "$JAR" -b "$JAR" -X POST "$BASE/login" \
-  --data-urlencode "_csrf=$TOKEN" --data-urlencode "email=admin@lp-test.local' OR '1'='1" --data-urlencode "password=x" \
+  --data-urlencode "_csrf=$TOKEN" --data-urlencode "email=$TEST_ADMIN_EMAIL' OR '1'='1" --data-urlencode "password=x" \
   -o ./tests/tmp/sec_c.html -w "HTTP:%{http_code}\n"
 grep -i "invalid email or password\|dashboard" ./tests/tmp/sec_c.html | head -2
 echo "(table still intact check)"
@@ -24,7 +29,7 @@ echo "=== D. Wrong password rejected + throttling after repeated failures ==="
 for i in 1 2 3 4 5 6; do
   curl -s -c "$JAR" -b "$JAR" "$BASE/login" -o ./tests/tmp/sec_d0.html
   TOKEN=$(grep -o 'name="_csrf" value="[^"]*"' ./tests/tmp/sec_d0.html | head -1 | sed -E 's/.*value="([^"]*)".*/\1/')
-  curl -s -c "$JAR" -b "$JAR" -X POST "$BASE/login" -d "_csrf=$TOKEN" -d "email=admin@lp-test.local" -d "password=WrongPass$i" -o ./tests/tmp/sec_d.html
+  curl -s -c "$JAR" -b "$JAR" -X POST "$BASE/login" -d "_csrf=$TOKEN" -d "email=$TEST_ADMIN_EMAIL" -d "password=WrongPass$i" -o ./tests/tmp/sec_d.html
   grep -o "Invalid email or password\.\|Too many failed attempts[^<]*" ./tests/tmp/sec_d.html | head -1
 done
 
