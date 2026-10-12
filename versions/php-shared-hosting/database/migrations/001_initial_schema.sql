@@ -17,7 +17,7 @@ SET time_zone = '+00:00';
 -- ---------------------------------------------------------------------
 -- Users & roles (prisma: enum Role { ADMIN STAFF PRODUCTION CUSTOMER })
 -- ---------------------------------------------------------------------
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(30) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL,
@@ -36,7 +36,7 @@ CREATE TABLE users (
 -- ---------------------------------------------------------------------
 -- Customers (prisma: model Customer)
 -- ---------------------------------------------------------------------
-CREATE TABLE customers (
+CREATE TABLE IF NOT EXISTS customers (
     id VARCHAR(30) PRIMARY KEY,
     display_id VARCHAR(30) NOT NULL,
     user_id VARCHAR(30) NULL,
@@ -60,7 +60,7 @@ CREATE TABLE customers (
 -- Services (minimal catalog — prisma: model Service, reduced to the
 -- fields this slice's quotation/order line items need)
 -- ---------------------------------------------------------------------
-CREATE TABLE services (
+CREATE TABLE IF NOT EXISTS services (
     id VARCHAR(30) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     category VARCHAR(100) NULL,
@@ -76,7 +76,7 @@ CREATE TABLE services (
 -- ---------------------------------------------------------------------
 -- Inquiries (prisma: model Inquiry, enum InquiryStatus)
 -- ---------------------------------------------------------------------
-CREATE TABLE inquiries (
+CREATE TABLE IF NOT EXISTS inquiries (
     id VARCHAR(30) PRIMARY KEY,
     customer_id VARCHAR(30) NOT NULL,
     description TEXT NOT NULL,
@@ -104,7 +104,7 @@ CREATE TABLE inquiries (
 -- Discount/tax breakdown preserved exactly — see lib/pricing-totals.ts's
 -- computeTotals(), ported verbatim in app/Services/PricingService.php.
 -- ---------------------------------------------------------------------
-CREATE TABLE quotations (
+CREATE TABLE IF NOT EXISTS quotations (
     id VARCHAR(30) PRIMARY KEY,
     inquiry_id VARCHAR(30) NULL,
     customer_id VARCHAR(30) NOT NULL,
@@ -137,7 +137,7 @@ CREATE TABLE quotations (
     KEY idx_quotations_customer (customer_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE quotation_line_items (
+CREATE TABLE IF NOT EXISTS quotation_line_items (
     id VARCHAR(30) PRIMARY KEY,
     quotation_id VARCHAR(30) NOT NULL,
     product_type VARCHAR(255) NOT NULL,
@@ -155,7 +155,7 @@ CREATE TABLE quotation_line_items (
 -- ---------------------------------------------------------------------
 -- Orders (prisma: model Order / OrderLineItem)
 -- ---------------------------------------------------------------------
-CREATE TABLE orders (
+CREATE TABLE IF NOT EXISTS orders (
     id VARCHAR(30) PRIMARY KEY,
     quotation_id VARCHAR(30) NULL,
     customer_id VARCHAR(30) NOT NULL,
@@ -197,7 +197,7 @@ CREATE TABLE orders (
     KEY idx_orders_customer (customer_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE order_line_items (
+CREATE TABLE IF NOT EXISTS order_line_items (
     id VARCHAR(30) PRIMARY KEY,
     order_id VARCHAR(30) NOT NULL,
     product_type VARCHAR(255) NOT NULL,
@@ -215,7 +215,7 @@ CREATE TABLE order_line_items (
 -- ---------------------------------------------------------------------
 -- Payments (prisma: model Payment, enum PaymentStatus/PaymentMethod)
 -- ---------------------------------------------------------------------
-CREATE TABLE payments (
+CREATE TABLE IF NOT EXISTS payments (
     id VARCHAR(30) PRIMARY KEY,
     order_id VARCHAR(30) NOT NULL,
     amount DECIMAL(12,2) NOT NULL,
@@ -237,7 +237,7 @@ CREATE TABLE payments (
 -- Production — workflow templates/stages + job orders
 -- (prisma: WorkflowTemplate / WorkflowStage / JobOrder)
 -- ---------------------------------------------------------------------
-CREATE TABLE workflow_templates (
+CREATE TABLE IF NOT EXISTS workflow_templates (
     id VARCHAR(30) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     active TINYINT(1) NOT NULL DEFAULT 1,
@@ -245,7 +245,7 @@ CREATE TABLE workflow_templates (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE workflow_stages (
+CREATE TABLE IF NOT EXISTS workflow_stages (
     id VARCHAR(30) PRIMARY KEY,
     template_id VARCHAR(30) NOT NULL,
     name VARCHAR(255) NOT NULL,
@@ -257,7 +257,7 @@ CREATE TABLE workflow_stages (
     CONSTRAINT fk_stages_template FOREIGN KEY (template_id) REFERENCES workflow_templates(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE job_orders (
+CREATE TABLE IF NOT EXISTS job_orders (
     id VARCHAR(30) PRIMARY KEY,
     order_id VARCHAR(30) NOT NULL,
     jo_number VARCHAR(50) NOT NULL,
@@ -285,7 +285,7 @@ CREATE TABLE job_orders (
 -- Stage-change history — powers "Undo" (spec section 10 Production:
 -- "Undo functionality"): each advance is logged so the immediately
 -- prior stage/status can be restored exactly, not merely decremented.
-CREATE TABLE job_order_stage_logs (
+CREATE TABLE IF NOT EXISTS job_order_stage_logs (
     id VARCHAR(30) PRIMARY KEY,
     job_order_id VARCHAR(30) NOT NULL,
     from_stage_order INT NULL,
@@ -303,7 +303,7 @@ CREATE TABLE job_order_stage_logs (
 -- ---------------------------------------------------------------------
 -- QC (prisma: model QCResult, enum QCOutcome)
 -- ---------------------------------------------------------------------
-CREATE TABLE qc_results (
+CREATE TABLE IF NOT EXISTS qc_results (
     id VARCHAR(30) PRIMARY KEY,
     job_order_id VARCHAR(30) NOT NULL,
     item_label VARCHAR(255) NOT NULL,
@@ -320,7 +320,7 @@ CREATE TABLE qc_results (
 -- ---------------------------------------------------------------------
 -- Inventory (prisma: model InventoryItem, reduced)
 -- ---------------------------------------------------------------------
-CREATE TABLE inventory_items (
+CREATE TABLE IF NOT EXISTS inventory_items (
     id VARCHAR(30) PRIMARY KEY,
     sku VARCHAR(100) NOT NULL,
     name VARCHAR(255) NOT NULL,
@@ -335,7 +335,7 @@ CREATE TABLE inventory_items (
 -- Business settings — single row, same shape as prisma's BusinessSettings
 -- (reduced to this slice's needs; id is always 'default').
 -- ---------------------------------------------------------------------
-CREATE TABLE business_settings (
+CREATE TABLE IF NOT EXISTS business_settings (
     id VARCHAR(30) PRIMARY KEY DEFAULT 'default',
     business_name VARCHAR(255) NOT NULL DEFAULT 'LP System',
     tagline VARCHAR(255) NULL,
@@ -350,7 +350,7 @@ CREATE TABLE business_settings (
 -- (login, payment confirm/reject, order cancel, role changes) writes
 -- one row here; never silently skipped (spec section 15).
 -- ---------------------------------------------------------------------
-CREATE TABLE audit_log (
+CREATE TABLE IF NOT EXISTS audit_log (
     id VARCHAR(30) PRIMARY KEY,
     actor_id VARCHAR(30) NULL,
     action VARCHAR(100) NOT NULL,
@@ -368,7 +368,7 @@ CREATE TABLE audit_log (
 -- served by a static path; app/Controllers/UploadController.php streams
 -- them only after an authorization check. See SECURITY.md.
 -- ---------------------------------------------------------------------
-CREATE TABLE uploaded_files (
+CREATE TABLE IF NOT EXISTS uploaded_files (
     id VARCHAR(30) PRIMARY KEY,
     owner_type VARCHAR(50) NOT NULL,
     owner_id VARCHAR(30) NOT NULL,

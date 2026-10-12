@@ -4,12 +4,8 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # Allow the installer to be reached directly (it has its own
-    # index.php / lock check) before the catch-all rewrite below.
-    RewriteCond %{REQUEST_URI} ^/install/ [NC]
-    RewriteRule ^ - [L]
-
-    # Serve real files/directories (assets, uploads) directly.
+    # Serve real files/directories directly: assets, uploads, and the
+    # installer folder (install/index.php has its own lock check).
     RewriteCond %{REQUEST_FILENAME} -f [OR]
     RewriteCond %{REQUEST_FILENAME} -d
     RewriteRule ^ - [L]
@@ -20,12 +16,24 @@
 
 # Never serve directory listings.
 Options -Indexes
+DirectoryIndex index.php
+
+# Hidden files (.htaccess, .gitkeep, editor backups) are never served.
+<FilesMatch "^\.">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
 
 # Security headers (defense in depth; see SECURITY.md).
 <IfModule mod_headers.c>
     Header always set X-Content-Type-Options "nosniff"
-    Header always set X-Frame-Options "SAMEORIGIN"
-    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set X-Frame-Options "DENY"
+    Header always set Referrer-Policy "same-origin"
 </IfModule>
 
 # Never execute scripts inside the uploads directory, even if one is

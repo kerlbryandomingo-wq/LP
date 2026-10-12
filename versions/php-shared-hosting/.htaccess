@@ -17,14 +17,16 @@ Options -Indexes
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
+    # Pattern is relative to this folder, so this works the same whether the
+    # package is in the web root (/) or in a subfolder (/lpsystem/).
     # Already inside public/? Leave it to public/.htaccess.
-    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^public/ - [L]
     RewriteRule ^(.*)$ public/$1 [L]
 </IfModule>
 
 # Second layer, in case mod_rewrite is off: block files that must never be
 # downloadable from the web root.
-<FilesMatch "(\.(md|sql|sh|json|lock|log|ini)|^\.gitignore|^\.gitkeep)$">
+<FilesMatch "(\.(md|sql|sh|json|lock|log|ini|bak|dist)|^\..*)$">
     <IfModule mod_authz_core.c>
         Require all denied
     </IfModule>

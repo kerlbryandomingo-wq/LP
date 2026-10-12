@@ -24,7 +24,7 @@ final class PaymentService
         return (float) $stmt->fetch()['total'];
     }
 
-    /** @return array{order:array, total:float, confirmed:float, requiredPartial:float, partialMet:bool, fullyPaid:bool, hasApprovedTerms:bool} */
+    /** @return array{order:array, total:float, confirmed:float, balance:float, requiredPartial:float, partialMet:bool, fullyPaid:bool, hasApprovedTerms:bool} */
     public static function paymentSummary(string $orderId): array
     {
         $pdo = Database::connection();
@@ -35,9 +35,9 @@ final class PaymentService
             throw new RuntimeException("Order {$orderId} not found.");
         }
 
-        $confirmed = self::confirmedPaymentTotal($orderId);
-        $total = (float) $order['total_amount'];
-        $requiredPartial = $total * ((int) $order['required_partial_pct'] / 100);
+        $confirmed = PricingService::round2(self::confirmedPaymentTotal($orderId));
+        $total = PricingService::round2((float) $order['total_amount']);
+        $requiredPartial = PricingService::round2($total * ((int) $order['required_partial_pct'] / 100));
         $hasApprovedTerms = $order['payment_term_type'] === 'APPROVED_TERMS' && !empty($order['terms_approved_by']);
 
         return [
@@ -45,8 +45,10 @@ final class PaymentService
             'total' => $total,
             'confirmed' => $confirmed,
             'requiredPartial' => $requiredPartial,
-            'partialMet' => $confirmed >= $requiredPartial,
-            'fullyPaid' => $confirmed >= $total,
+            // Compared in whole centavos so float noise can never flip a gate.
+            'balance' => max(0.0, PricingService::round2($total - $confirmed)),
+            'partialMet' => (int) round($confirmed * 100) >= (int) round($requiredPartial * 100),
+            'fullyPaid' => (int) round($confirmed * 100) >= (int) round($total * 100),
             'hasApprovedTerms' => $hasApprovedTerms,
         ];
     }

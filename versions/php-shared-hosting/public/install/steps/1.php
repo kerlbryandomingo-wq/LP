@@ -1,9 +1,13 @@
-<h2 style="margin-top:0">Welcome</h2>
-<p>This wizard will install LP System (PHP / MySQL shared-hosting edition) on this server.
-You will need:</p>
+<h2 class="step-title">Welcome</h2>
+<p>This wizard installs LP System on this server. You will need:</p>
 <ul>
-  <li>A MySQL or MariaDB database, plus a username/password with full privileges on it</li>
-  <li>5 minutes</li>
+  <li>An <strong>empty MySQL or MariaDB database</strong>, and a database user with ALL PRIVILEGES on it (cPanel → MySQL Databases).</li>
+  <li>The database name, username and password.</li>
+  <li>About 5 minutes.</li>
 </ul>
-<p>Nothing is changed on this server until you reach the final "Finish" step.</p>
-<a href="/install/?step=2" class="btn btn-primary">Start Installation</a>
+<p>You will not need to edit any files. Nothing is written to the database until step 4.</p>
+<form method="post" action="<?= e(url('/install/')) ?>">
+  <input type="hidden" name="_token" value="<?= e($token) ?>">
+  <input type="hidden" name="_step" value="1">
+  <button type="submit" class="btn btn-primary">Start Installation</button>
+</form>

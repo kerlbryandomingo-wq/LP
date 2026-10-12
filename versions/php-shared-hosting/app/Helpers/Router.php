@@ -37,7 +37,13 @@ final class Router
 
     public function dispatch(string $method, string $uri): void
     {
-        $path = rtrim(parse_url($uri, PHP_URL_PATH) ?? '/', '/');
+        $path = parse_url($uri, PHP_URL_PATH) ?: '/';
+        // Installed in a subfolder (/lpsystem/...): match routes without it.
+        $base = base_path();
+        if ($base !== '' && ($path === $base || str_starts_with($path, $base . '/'))) {
+            $path = substr($path, strlen($base));
+        }
+        $path = rtrim($path, '/');
         if ($path === '') {
             $path = '/';
         }
@@ -61,11 +67,6 @@ final class Router
             }
         }
 
-        http_response_code(404);
-        if (is_file(APP_ROOT . '/app/Views/errors/404.php')) {
-            require APP_ROOT . '/app/Views/errors/404.php';
-        } else {
-            echo '404 Not Found';
-        }
+        View::abort(404, 'Page not found', 'The page you were looking for does not exist.');
     }
 }

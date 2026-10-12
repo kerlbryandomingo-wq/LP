@@ -2,11 +2,10 @@
 config/config.php
 storage/install.lock
 storage/logs/*.log
+config/.config.*.tmp
 storage/cache/*
 !storage/cache/.gitkeep
 storage/private-uploads/*
 !storage/private-uploads/.gitkeep
-public/uploads/*
-!public/uploads/.gitkeep
 vendor/
 .env

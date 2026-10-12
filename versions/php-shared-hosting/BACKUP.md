@@ -8,9 +8,8 @@
    this without a backup means reconstructing it by hand (possible —
    `config/config.sample.php` shows the exact shape — but your real
    values won't be recoverable from anywhere else).
-3. **`storage/private-uploads/`** — payment proofs and other private
-   documents. Not in the database; these are files on disk.
-4. **`public/uploads/`** — any public assets uploaded through the app.
+3. **`storage/private-uploads/`** — payment proofs. Not in the database;
+   these are files on disk.
 
 ## How to back up on typical shared hosting
 
@@ -18,9 +17,9 @@
   "Quick" method, SQL format → download. Most hosts also offer a cPanel
   → Backup Wizard that includes databases automatically on a schedule —
   turn this on if available.
-- **Files**: cPanel → File Manager → select `config/config.php`,
-  `storage/private-uploads/`, `public/uploads/` → Compress → download the
-  resulting `.zip`. Or via FTP, download these three paths directly.
+- **Files**: cPanel → File Manager → select `config/config.php` and
+  `storage/private-uploads/` → Compress → download the resulting `.zip`.
+  Or via FTP, download these two paths directly.
 - **Frequency**: at minimum, before every upgrade (see UPGRADE.md) and on
   whatever recurring schedule your host's backup tool supports — daily is
   reasonable for an active business system.
@@ -29,20 +28,18 @@
 
 1. **Database**: cPanel → phpMyAdmin → select the (re-created, empty)
    database → Import → choose your `.sql` backup file → Go.
-2. **Files**: upload `config/config.php` back to `config/`,
-   `storage/private-uploads/` back to `storage/`, `public/uploads/` back
-   to `public/`. Overwrite what's there.
-3. Confirm `storage/install.lock` still exists (it should, since you're
-   restoring an already-installed system) — if the installer reappears,
-   something's wrong; do not re-run it against a database that already
-   has data: instead, re-create the lock file with any content
-   (`echo "restored" > storage/install.lock` via File Manager, or just
-   re-upload it from your backup).
+2. **Files**: upload `config/config.php` back to `config/` and
+   `storage/private-uploads/` back to `storage/`. Overwrite what's there.
+3. The installer stays locked as long as `config/config.php` (restored in
+   step 2) is present.
+
+**Lost `config/config.php` but the database is fine?** Upload a fresh copy
+of the release, run the installer, enter the same database, and tick the
+"keep existing data" confirmation (INSTALL.md → "Reinstalling"). Nothing is
+deleted; you create a new administrator and carry on.
 
 ## Disaster recovery (starting over)
 
 If you've lost everything (no file backup, no DB backup) you will need to
-reinstall from scratch: delete `storage/install.lock`, delete all tables
-in the database (or point the installer at a fresh database), and run the
-installer again. **All prior business data is unrecoverable in this
+reinstall from scratch into a new, empty database. **All prior business data is unrecoverable in this
 scenario** — this is exactly why routine backups matter.

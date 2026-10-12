@@ -4,7 +4,7 @@
 -- atomically via `UPDATE ... SET value = LAST_INSERT_ID(value + 1)`
 -- inside a transaction — see App\Services\NumberSequenceService.
 
-CREATE TABLE number_sequences (
+CREATE TABLE IF NOT EXISTS number_sequences (
     scope VARCHAR(20) NOT NULL,
     year INT NOT NULL,
     value INT NOT NULL DEFAULT 0,

@@ -26,14 +26,30 @@ final class UploadService
         'application/pdf' => 'pdf',
     ];
 
-    /** @param array $file one entry of $_FILES */
-    public static function storePrivate(array $file, string $ownerType, string $ownerId, ?string $uploadedById): string
+    /**
+     * @param array $file one entry of $_FILES
+     * @return array{0:string,1:string} [uploaded_files id, absolute stored path] — the caller deletes the path if its transaction fails
+     */
+    public static function storePrivate(array $file, string $ownerType, string $ownerId, ?string $uploadedById): array
     {
-        if ($file['error'] !== UPLOAD_ERR_OK) {
-            throw new RuntimeException('Upload failed (error code ' . $file['error'] . ').');
+        if (is_array($file['error'] ?? null) || is_array($file['name'] ?? null)) {
+            throw new RuntimeException('Upload one file at a time.');
         }
-        if ($file['size'] > self::MAX_BYTES) {
+        $error = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
+        if (in_array($error, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
             throw new RuntimeException('File is too large (max 8MB).');
+        }
+        if ($error !== UPLOAD_ERR_OK) {
+            throw new RuntimeException('The file could not be uploaded. Please try again.');
+        }
+        if ((int) $file['size'] <= 0) {
+            throw new RuntimeException('The uploaded file is empty.');
+        }
+        if ((int) $file['size'] > self::MAX_BYTES) {
+            throw new RuntimeException('File is too large (max 8MB).');
+        }
+        if (!is_uploaded_file($file['tmp_name'])) {
+            throw new RuntimeException('The file could not be uploaded. Please try again.');
         }
 
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
@@ -47,8 +63,8 @@ final class UploadService
         $ext = self::ALLOWED_MIME[$mime];
         $storedName = Id::generate('file') . '.' . $ext;
         $destDir = APP_ROOT . '/storage/private-uploads/' . preg_replace('/[^a-zA-Z0-9_-]/', '', $ownerType);
-        if (!is_dir($destDir)) {
-            mkdir($destDir, 0755, true);
+        if (!is_dir($destDir) && !@mkdir($destDir, 0755, true) && !is_dir($destDir)) {
+            throw new RuntimeException('The upload folder is not writable. Ask your administrator to check storage/private-uploads permissions.');
         }
         $destPath = $destDir . '/' . $storedName;
 
@@ -68,14 +84,15 @@ final class UploadService
             'id' => $id,
             'owner_type' => $ownerType,
             'owner_id' => $ownerId,
-            'original_name' => basename($file['name']),
+            // Display name only (never used as a path): strip directories and control characters.
+            'original_name' => mb_substr(preg_replace('/[\x00-\x1F\x7F"\\\\\/]/u', '_', basename(str_replace('\\', '/', (string) $file['name']))) ?: 'file', 0, 200),
             'stored_name' => $storedName,
             'mime_type' => $mime,
             'size_bytes' => $file['size'],
             'uploaded_by_id' => $uploadedById,
         ]);
 
-        return $id;
+        return [$id, $destPath];
     }
 
     public static function privatePath(string $ownerType, string $storedName): string

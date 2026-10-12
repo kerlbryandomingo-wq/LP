@@ -1,115 +1,69 @@
-# Feature Parity Checklist — Honest Status
+# Feature Parity — Honest Status (Release 3)
 
-This is not a marketing document. Every row below reflects what was
-actually implemented and tested in this release, not what was planned.
-"Implemented & tested" means real database operations, validation, and
-authorization exist and were exercised end-to-end against a live
-MySQL/MariaDB database (see TESTING.md for exact test transcripts).
-"Not ported" means the feature does not exist in this PHP codebase at
-all — it is not a stub, not a mock, and the original Next.js app is the
-only place it currently works.
+"Implemented & tested" means the feature exists with server-side validation
+and authorization, and was exercised end-to-end over HTTP against a real
+Apache + MariaDB installation made from the release ZIP (see TESTING.md and
+the QA report shipped next to the ZIP). "Not ported" means it does not exist
+in this codebase at all. There are no stubs or fake screens.
 
 ## Implemented & tested
 
-| Module | Status | Notes |
-|---|---|---|
-| Authentication (login/logout) | ✅ Implemented & tested | Session-based, bcrypt-compatible with the original's `bcryptjs` hashes, login throttling, session fixation protection |
-| Role model (ADMIN/STAFF/PRODUCTION/CUSTOMER) | ✅ Implemented & tested | Server-side `requireRole()` gates on every controller action that needs one |
-| Customers (create, list, search, view) | ✅ Implemented & tested | |
-| Inquiries (create, list, view, convert to quotation) | ✅ Implemented & tested | Desired-product/service/qty carry-over to the quotation form preserved |
-| Quotations (create with line items, discount, tax, send/approve/reject, convert to order) | ✅ Implemented & tested | `PricingService::computeTotals()` is a line-by-line port of the original `lib/pricing-totals.ts`'s `computeTotals()` — same rounding, same clamping. Verified live: a 10%-discount + 12%-tax quotation on ₱1,000 subtotal computed exactly ₱1,008.00 total, matching the original formula by hand-calculation |
-| Orders (creation from an approved quotation, cancel) | ✅ Implemented & tested | Pricing breakdown (subtotal/discount/tax) copied from the source quotation exactly, as the original does |
-| Payments (manual record with proof upload, staff confirm/reject, balance display) | ✅ Implemented & tested | `PaymentService` is a line-by-line port of the original `lib/workflow.ts`'s `confirmedPaymentTotal()`/`paymentSummary()`. Verified live: recording and confirming a partial payment recalculated the order's balance from ₱1,008.00 to ₱504.00 exactly |
-| Concurrency-safe numbering (quotation/order/job-order numbers) | ✅ Implemented & tested | Atomic `INSERT ... ON DUPLICATE KEY UPDATE ... LAST_INSERT_ID()` pattern — verified two sequential calls return 1 then 2 with no gap or collision |
-| Production — Job Orders, button-based stage progression, Undo | ✅ Implemented & tested | Payment gates preserved: starting production requires partial payment or an approved-terms exception (Rule #1), releasing requires full payment or an authorized exception (Rule #2) — both verified live, including the exact rejection message format matching the original |
-| QC checklist (item-level PASS/FAIL recording) | ✅ Implemented & tested | |
-| Inventory (stock level list, low-stock indicator) | ✅ Implemented & tested | Read-only in this release — see "Not ported" for consumption/costing |
-| Dashboard (KPI counts) | ✅ Implemented & tested | Basic counts only — see "Not ported" for the full chart/analytics dashboard |
-| CSRF protection | ✅ Implemented & tested | |
-| SQL injection protection | ✅ Implemented & tested | PDO prepared statements throughout; live injection attempts against login confirmed harmless |
-| Private file uploads (payment proofs) | ✅ Implemented & tested | MIME allowlist, size cap, randomized names, stored outside the public document root |
-| WordPress-style installer | ✅ Implemented & tested | Full 6-step wizard, tested end-to-end against a live MariaDB database including the self-lock and reinstall-block behavior |
-| Apache `.htaccess` security (config/storage/database/app protection, PHP-execution denial in uploads) | ✅ Implemented & tested | Tested over a real installed Apache 2.4 + mod_rewrite + mod_headers + mod_php, not just assumed — see TESTING.md |
+| Area | Notes |
+|---|---|
+| Browser installer | 6 steps, step gating, CSRF, requirement re-check, plain-language DB errors, existing-database detection, migration tracking, lock |
+| Database updates | `schema_migrations` tracking; **Admin → Database Updates** applies new releases' updates; upgrade from the first PHP release tested |
+| Sign-in / sign-out / change password | bcrypt (compatible with the original's `bcryptjs` hashes), DB-backed throttling, session fixation protection, forced password change for temporary passwords |
+| Roles | ADMIN (everything), STAFF (sales, payments, production, inventory, exports), PRODUCTION (job orders, QC, inventory view; no prices or payments). CUSTOMER accounts are refused at sign-in (portal not ported) |
+| User management | Admin creates users with one-time temporary passwords, changes role, deactivates (takes effect on the next request), resets passwords; can't demote/deactivate self or the last admin |
+| Customers | Create, edit, search, paginate, detail with orders/quotations/inquiries; admin-only "qualified for payment terms" flag |
+| Inquiries | Create, list/filter/search, cancel with reason, convert to quotation (prefilled) |
+| Quotations | Line items, percentage/fixed discount, tax, server-side totals (`PricingService::computeTotals`, line-by-line port of `lib/pricing-totals.ts`); edit while DRAFT/SENT/REVISION_REQUESTED; mark sent; staff approval on the customer's behalf with a required reason; record customer rejection / requested changes; cancel and restore; one live quotation per inquiry |
+| Orders | Created automatically on approval (port of `lib/quotation-conversion.ts`), one order per quotation (code lock + unique key), payment terms from the customer flag, admin can change terms / grant a release exception, cancel with reason, complete after release, CSV export |
+| Payments | Record with optional proof (JPG/PNG/WEBP/PDF ≤ 8 MB), non-future date, reference required for non-cash, never above the outstanding balance, duplicate submission and duplicate reference refused, confirm/reject with re-check under lock, CSV export |
+| Production | One job order per line item; first job order created automatically when the 50 % partial is confirmed or terms are approved (as in the original); button-based stages with Undo and stage history; start gated on partial payment, release gated on full payment or release exception (ports of `lib/workflow.ts` rules); stale or double-clicked actions refused |
+| QC | Results recorded at the QC stage; the stage can't be passed without a result or while an item's latest result is FAIL |
+| Inventory | Create, edit stock and reorder level, low-stock filter |
+| Dashboard | Counts, confirmed this month, outstanding balance, recent orders |
+| Security controls | See SECURITY.md (CSRF, prepared statements, escaping + CSP, upload checks, private files, headers, audit log) |
 
-## Partially ported (real, but reduced scope)
+## Simplified compared with the original
 
-| Module | Status | What's missing |
-|---|---|---|
-| Discount/Tax pricing | ✅ Full parity | — |
-| Order/Quotation line items | ✅ Full parity on the fields exercised in testing | The original's per-line `specs` JSON (custom per-product spec fields) is stored in the schema but this release's forms don't yet have a UI to populate structured specs — it's always null here. |
-| Job Order stage progression semantics | ⚠️ Reasonable reproduction, not a byte-verified port | `PaymentService`/`PricingService` were ported by reading the original source line-by-line. `ProductionService`'s exact stage-transition rules (when QC is entered, when a rework loop occurs) were reconstructed from the original's `WorkflowStage` schema and the two payment-gate rules, but the original's full `completeCurrentStage()` function (~150 lines in `lib/workflow.ts`) was not individually verified line-by-line against this port. The payment gates themselves (the part that matters most for financial correctness) ARE byte-verified. |
-| Dashboard | ⚠️ Reduced | The original's KPI sparklines, Sales Overview/Top Services/Service Cost Breakdown/P&L/Payment Methods charts (recent "Whiskey" dashboard work) are not ported — this release shows 4 plain count KPIs and a recent-orders table only. |
+| Area | Difference |
+|---|---|
+| Staff permissions | The original grants permissions per staff member; here every STAFF account has the same fixed set (`app/Services/Policy.php`) |
+| Numbering | `QUO-/ORD-/JO-YYYY-0001` sequences; the original derives order/JO numbers from the quotation number |
+| Services catalogue | No management screen; quotation lines are free text. All job orders use the default 5-stage workflow (Design → Printing → Finishing → Quality Control → Ready) |
+| Line-item specs | The `specs` JSON column exists but there is no structured specs form |
+| Dashboard | No charts (sales overview, top services, P&L, payment methods) |
+| QC | Free-text checklist items; no per-service checklist templates; no REWORK loop status |
+| Quotation documents | No printable/PDF quotation or invoice |
 
-## Not ported (documented gap, not a silent omission)
+## Not ported
 
-These exist in the original Next.js application and do **not** exist in
-this PHP codebase at all:
+These exist only in the original Next.js application:
 
-- **Customer self-service portal** (customers logging in to view their own
-  orders/quotations/invoices). This release is staff/admin-facing only.
-  Object-level "can this customer see this record" authorization, which
-  the original spec correctly flags as critical, was never built because
-  there is no customer-facing surface yet to protect.
-- **Customer Forms** — secure form links, submission, locking,
-  admin-authorized reopening, version history, per-item printed locks.
-  None of this exists in this release.
-- **Drag-and-drop production Kanban.** Button-based stage progression
-  (Advance / Undo) is implemented and tested; the drag-and-drop
-  interaction is not.
-- **Google/Facebook OAuth login.**
-- **Meta Messenger integration** (webhooks, signature verification,
-  outbound messages).
-- **Email sending** (quotation/order/payment notification emails).
-  `config.sample.php` has SMTP settings fields reserved for this, but no
-  PHPMailer integration or send logic has been written yet.
-- **Server-Sent Events / real-time notifications.** Not attempted in this
-  release in any form, including polling.
-- **Statement of Account (SOA) / monthly statements.**
-- **Expense tracking, Suppliers, Supply Lots, Material Consumption,
-  Service BOM/costing.** The `services` table exists with a
-  `production_cost` flat field only — the original's full BOM-based
-  costing engine (`ServiceBOMMaterial`, `ServiceCostComponent`,
-  `JobOrderMaterialConsumption`) was not ported.
-- **Rewards/loyalty points redemption flow.** The `reward_points_balance`
-  column exists on `customers` (for schema parity) but nothing writes or
-  reads it yet.
-- **Exports (CSV/PDF) and most reports** beyond the dashboard's basic
-  counts.
-- **Scheduled/cron reminder tasks.**
-- **Data migration tooling from the live PostgreSQL database.** A
-  migration *procedure* is documented conceptually below, but no
-  Postgres→MySQL export/transform/import script was written or tested
-  against real data, because no production data migration was attempted
-  per the task's own explicit prohibition on touching production data
-  during development.
+- Customer portal (customer sign-in, own orders/quotations, online approval)
+- Customer forms (secure links, submissions, locking, versions)
+- Statements of account
+- Expenses, suppliers, supply lots, material consumption, BOM/costing
+- Rewards/loyalty points, vouchers
+- Google/Facebook sign-in, Messenger integration
+- Email sending and in-app/real-time notifications
+- Drag-and-drop production board
+- Order fulfilment/delivery records, design/proof workflow, installation stage handling
+- Global search, scheduled reminders, PDF exports
+- Business settings screen (name is set by the installer), theme switching
+- Tooling to migrate data from the original PostgreSQL database
 
-## Data migration from the original PostgreSQL database — procedure (not yet executable tooling)
+## Migrating data from the original PostgreSQL database (procedure only)
 
-This release includes the target MySQL schema (`database/migrations/`)
-designed to correspond field-for-field with the equivalent Prisma models,
-but does **not** include a working, tested Postgres→MySQL export/import
-script. Building and testing one safely requires either a sanitized copy
-of real production data or representative synthetic data at realistic
-volume, and the task's own rules correctly prohibit touching production
-data during development. The procedure, when someone builds this script:
-
-1. Export each Postgres table to CSV (`\copy ... TO ... CSV`) or JSON.
-2. Transform: Decimal values preserved as-is (MySQL's `DECIMAL(12,2)`
-   matches Postgres's `@db.Decimal(12,2)` precision exactly — no float
-   conversion anywhere); enum string values map 1:1 (both schemas use
-   the same enum value names); `cuid()` string IDs carry over unchanged
-   (this schema's `VARCHAR(30)` primary keys accept them as-is, so
-   existing foreign-key relationships are preserved by reusing the same
-   ID values rather than regenerating them).
-3. Import in dependency order: `users` → `customers` → `services` →
-   `inquiries` → `quotations` → `quotation_line_items` → `orders` →
-   `order_line_items` → `payments` → `workflow_templates` →
-   `workflow_stages` → `job_orders` → everything else.
-4. Validate: row counts per table match source exactly; `SUM(total)`
-   across quotations and `SUM(amount)` across confirmed payments match
-   the source database's equivalent aggregate query; spot-check 5-10
-   orders' full payment history and balance against the original app's
-   own display of the same orders.
-5. Never run this against the live production database directly — export
-   from a read replica or a fresh pg_dump restore, import into a fresh
-   MySQL database, validate, and only then consider cutover.
+No migration script ships with this release, and none was run (no production
+data was used). The schema mirrors the Prisma models (same enum values,
+`DECIMAL(12,2)` money, `VARCHAR(30)` ids that accept the original cuid
+values). Procedure: export each table from a read replica or a restored
+dump, import in dependency order (users → customers → services → inquiries →
+quotations → quotation_line_items → orders → order_line_items → payments →
+workflow tables → job_orders → the rest) into a fresh MySQL database, then
+compare row counts, `SUM(total)` of quotations and `SUM(amount)` of
+confirmed payments, and spot-check several orders' balances against the
+original app before any cut-over.

@@ -1,47 +1,49 @@
 # Upgrading LP System (PHP/MySQL Edition)
 
-There is no automatic updater in this release — upgrades are a manual
-file-replace + migration step, which is the safest approach on shared
-hosting where you may not have shell access.
+Upgrades are a file upload followed by one click under **Admin → Database
+Updates**. No phpMyAdmin or SQL is needed.
 
-## Before any upgrade
+## Before you start
 
-1. **Back up first.** Follow BACKUP.md completely — database dump AND a
-   copy of `config/config.php`, `storage/private-uploads/`, and
-   `public/uploads/` — before touching anything.
-2. Note your current version (check `CHANGELOG.md` if the release you're
-   upgrading from included one, or the release ZIP's filename/date).
+1. **Back up** the database and the files listed in BACKUP.md.
+2. Pick a quiet time. While files are being uploaded, a page request can
+   meet a mix of old and new files and show an error page. This stops by
+   itself once the upload finishes; nothing is saved half-way.
 
-## Upgrade steps
+## Steps
 
-1. Download the new release ZIP.
-2. **Do not overwrite `config/config.php`.** Extract the new release to a
-   separate folder first, then copy files over, excluding:
-   - `config/config.php` (keep your existing one — it has your real DB
-     credentials and app key)
-   - `storage/install.lock` (keep it — you do not want the installer to
-     reappear)
-   - `storage/private-uploads/`, `public/uploads/` (your real uploaded
-     files — never overwrite these with the empty ones from the release)
-3. Copy the new release's `app/`, `public/assets/`, `public/install/`
-   (skip it if you deleted it after installing), `public/index.php`,
-   `public/.htaccess`, the root `index.php` and root `.htaccess`, the
-   `.htaccess` files inside `config/`, `storage/`, `database/`, and
-   `database/migrations/` over the old ones. Make sure hidden files are
-   included — in cPanel File Manager turn on "Show Hidden Files."
-4. **Run any new migration files.** Check `database/migrations/` for
-   files numbered higher than the last one you applied (e.g. if you're on
-   `003_...sql` and the new release includes `004_...sql`, run only
-   `004_...sql` — never re-run old ones against a live database that
-   already has that schema). Run it the same way the installer does: via
-   phpMyAdmin's SQL tab, or `mysql -u youruser -p yourdb < 004_....sql` if
-   you have shell/SSH access. There is no browser-based "run pending
-   migrations" button in this release — review BACKUP.md's restore path
-   first and apply migrations by hand with a fresh backup in place.
-5. Reload the site and confirm you can log in and see your existing data.
+1. Extract the new release ZIP on your computer (or in an empty folder on the
+   server).
+2. Upload its contents **over** the existing installation, including hidden
+   `.htaccess` files, overwriting existing files. The new ZIP contains no
+   `config/config.php` and no `storage/install.lock`, and its `storage/`
+   holds only empty placeholder files, so uploading it does not touch your
+   settings, uploads or lock file. (Do not delete `config/` or `storage/`.)
+3. Sign in as an administrator. If the release contains database updates,
+   you are taken to **Admin → Database Updates** automatically, and other
+   users see a short "Update in progress" page until you finish.
+4. Click **Apply Updates**. Each update is recorded in `schema_migrations`
+   and is applied only once. Clicking again later just reports "already up
+   to date".
+5. Check that your data is there and the site works.
 
-## If something breaks mid-upgrade
+### Upgrading from the first PHP release (before Release 3)
 
-Restore the backup you took in step 1 — both the database dump and the
-file copies. Because you never overwrote `config/config.php` with a
-different one, a clean restore puts you back exactly where you started.
+That release had no `schema_migrations` table. The first **Apply Updates**
+re-checks every table (existing tables and rows are kept: all statements are
+`CREATE TABLE IF NOT EXISTS` / insert-if-missing) and then adds the Release 3
+tables and columns. This exact path was tested: previous release installed
+with data → new files uploaded → admin signs in → updates applied → data
+intact, new features working (TESTING.md).
+
+One Release 3 update adds a database rule of **one order per quotation**. If
+a database from the first release contains duplicate orders for the same
+quotation (possible there through a double click), that update stops with an
+error and nothing further is applied. Cancel or merge the duplicate orders,
+then click **Apply Updates** again.
+
+## If something goes wrong
+
+The update page reports failures without changing anything further; details
+go to `storage/logs/php-error.log`. Restore the backup from step "Before you
+start" (database and files) to return exactly to where you were.

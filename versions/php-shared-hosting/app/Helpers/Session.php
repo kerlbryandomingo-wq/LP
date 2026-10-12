@@ -5,14 +5,19 @@ declare(strict_types=1);
 namespace App\Helpers;
 
 /**
- * Secure session bootstrap (spec section 9): HttpOnly always, Secure
- * when served over HTTPS, SameSite=Lax (Strict would break an external
- * payment-gateway redirect back into the app, Lax is the standard safe
- * default), session ID regenerated on login (see AuthService::login) to
- * prevent session fixation, and an idle-timeout enforced on every request.
+ * Secure session bootstrap: HttpOnly always; Secure whenever the request is
+ * HTTPS (or the installer recorded HTTPS); SameSite=Lax; cookie scoped to the
+ * install's own path so two installs on one domain never share a session;
+ * session ID regenerated on login (AuthService::login); idle timeout.
  */
 final class Session
 {
+    public static function isHttps(): bool
+    {
+        return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || (string) ($_SERVER['SERVER_PORT'] ?? '') === '443';
+    }
+
     public static function start(): void
     {
         if (session_status() === PHP_SESSION_ACTIVE) {
@@ -20,11 +25,13 @@ final class Session
         }
 
         $cfg = app_config()['session'] ?? [];
-        $secure = (bool) ($cfg['secure_cookie'] ?? false);
+        $secure = (bool) ($cfg['secure_cookie'] ?? false) || self::isHttps();
 
+        ini_set('session.use_strict_mode', '1');
+        ini_set('session.use_only_cookies', '1');
         session_set_cookie_params([
             'lifetime' => 0,
-            'path' => '/',
+            'path' => base_path() . '/',
             'domain' => '',
             'secure' => $secure,
             'httponly' => true,
@@ -36,8 +43,8 @@ final class Session
         $lifetimeMinutes = (int) ($cfg['lifetime_minutes'] ?? 240);
         $now = time();
         if (isset($_SESSION['_last_activity']) && ($now - $_SESSION['_last_activity']) > $lifetimeMinutes * 60) {
-            self::destroy();
-            session_start();
+            $_SESSION = [];
+            session_regenerate_id(true);
         }
         $_SESSION['_last_activity'] = $now;
     }
@@ -51,8 +58,15 @@ final class Session
     {
         $_SESSION = [];
         if (ini_get('session.use_cookies')) {
-            $params = session_get_cookie_params();
-            setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+            $p = session_get_cookie_params();
+            setcookie(session_name(), '', [
+                'expires' => time() - 42000,
+                'path' => $p['path'],
+                'domain' => $p['domain'],
+                'secure' => $p['secure'],
+                'httponly' => $p['httponly'],
+                'samesite' => $p['samesite'] ?? 'Lax',
+            ]);
         }
         session_destroy();
     }

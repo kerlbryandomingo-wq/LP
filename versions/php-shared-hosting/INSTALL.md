@@ -1,97 +1,94 @@
 # Installing LP System (PHP/MySQL Edition)
 
-## Before you start
+You do not need to edit any PHP file or create any database table by hand.
 
-- Create a MySQL/MariaDB database and a database user with full privileges
-  on it. Most cPanel hosts: "MySQL Databases" → create database → create
-  user → "Add User to Database" with ALL PRIVILEGES.
-- Know your database host (almost always `localhost` on shared hosting).
-- The site must be installed at the root of a domain or subdomain, not in a
-  subfolder like `yourdomain.com/lp/`.
+## 1. Create the database
 
-## Uploading the files
+cPanel → **MySQL Databases**:
 
-1. cPanel → **File Manager** → open `public_html/` (or the folder your
-   subdomain points to). It should be empty, apart from anything your host
-   put there by default, such as `cgi-bin/`. Remove any placeholder
-   `index.html`, which would otherwise be shown instead of the app.
-2. Click **Upload**, choose `LP-System-PHP-Shared-Hosting.zip`, wait for it
-   to finish, then go back to `public_html/`.
-3. Right-click the ZIP → **Extract** → extract into `public_html/` itself.
-4. Check the result. Directly inside `public_html/` you should see
-   `index.php`, `public/`, `app/`, `config/`, `database/`, `storage/`,
-   `tests/` and the `.md` documents. The `.htaccess` files are hidden by
-   default — turn on File Manager → Settings → **Show Hidden Files
-   (dotfiles)** to see them. If instead you see a single extra folder that
-   contains all of this, you extracted into a subfolder: move its contents
-   up into `public_html/`.
-5. Delete the ZIP from `public_html/`.
+1. Create a database, e.g. `lpsystem`. cPanel adds your account prefix, so
+   the full name becomes something like `myaccount_lpsystem`.
+2. Create a database user with a strong password.
+3. **Add User To Database** → tick **ALL PRIVILEGES**.
 
-Do not move or rename any of the folders — the app finds them relative to
-each other. The root `.htaccess` makes sure only `public/` is ever served;
-everything else returns "Forbidden" even though it sits inside
-`public_html/`.
+Use an **empty** database. The installer refuses a database that holds
+another application's `users` table, and asks for explicit confirmation if
+the database already holds LP System data (see "Reinstalling" below).
 
-FTP works the same way: extract the ZIP on your computer and upload its
-contents (including the hidden `.htaccess` files) into `public_html/`.
+## 2. Upload the files
 
-**If your host lets you set a custom document root** (common for addon
-domains/subdomains), you may point it at the `public/` folder instead. That
-works too; nothing else changes.
+1. cPanel → **File Manager** → open the folder the site should live in:
+   - `public_html/` for `https://yourdomain.com/`, or
+   - a new folder such as `public_html/lpsystem/` for
+     `https://yourdomain.com/lpsystem/`.
+   Remove any placeholder `index.html` from that folder.
+2. **Upload** `LP-System-PHP-Shared-Hosting-Verified.zip`, then right-click
+   it → **Extract** into the same folder. Delete the ZIP afterwards.
+3. Check: `index.php`, `public/`, `app/`, `config/`, `database/` and
+   `storage/` must sit directly in that folder. If you see one extra folder
+   containing them, move its contents up one level. To see the `.htaccess`
+   files, enable File Manager → Settings → **Show Hidden Files**.
 
-## The wizard
+Via FTP: extract the ZIP on your computer and upload everything, including
+the hidden `.htaccess` files.
 
-1. **Welcome** — confirms you're ready; nothing is changed yet.
-2. **Requirements Check** — verifies PHP version, required extensions,
-   Apache `mod_rewrite` (where PHP can detect it), and that `config/`,
-   `storage/`, and `public/uploads/` are writable. A "FAIL"
-   here almost always means a folder permission — set it to `755` (or
-   `775` if your host requires group-writable) via File Manager's
-   "Permissions" option, then reload the page.
-3. **Database Connection** — enter your host/port/database/username/
-   password. The wizard tests the connection for real before letting you
-   continue; a wrong password or host shows the exact database error.
-4. **Create Database Tables** — creates the schema and loads a starter
-   production workflow template. Safe to click even if you're unsure
-   whether tables already exist — it checks first and never drops or
-   duplicates anything.
-5. **Create Administrator Account** — this becomes your first login. Use
-   a real email address you control and a password of at least 8
-   characters.
-6. **Site Settings** — business name, site URL (auto-detected — only
-   change this if you're installing at a URL different from the one
-   you're viewing the installer from), and timezone.
-7. **Finish** — writes `config/config.php` (with a freshly generated
-   random app key) and `storage/install.lock`, which permanently disables
-   the installer. You're redirected to `/login`.
+Optional: if your host lets you set a domain's document root, you may point
+it at the `public/` folder instead.
 
-## After installing
+## 3. Run the installer
 
-- **Delete or rename `public/install/`.** The lock file alone is enough to
-  stop reinstallation, but removing the folder is the most thorough option
-  and is recommended before going live.
-- Log in with the administrator account you just created.
-- Review **SECURITY.md** for HTTPS and further hardening steps.
+Open the site address. You are redirected to `…/install/`.
+
+| Step | What happens |
+|---|---|
+| 1 Welcome | Nothing is changed yet. |
+| 2 Requirements | Checks PHP version and extensions, that `config/` and `storage/` (and its subfolders) are writable, and that URL rewriting works. A **FAIL** blocks the next step, and the server re-checks when you continue. Folder failures: set the folder to `755` (or `775`) in File Manager → Permissions. |
+| 3 Database | Host (usually `localhost`), port (`3306`), database name, user, password. The connection is tested for real; errors are explained in plain words (wrong password, database missing or not assigned to the user, server unreachable). Your password is never shown back. |
+| 4 Create tables | Creates all tables and the starter production workflow, records each update in `schema_migrations`, then verifies every table exists. Safe to repeat if interrupted. |
+| 5 Administrator | Name, email (your sign-in), password: at least 8 characters with a letter and a number. |
+| 6 Site settings | Business name, site address (detected), timezone (default Asia/Manila). **Finish** saves the administrator, writes `config/config.php`, and locks the installer. |
+
+Steps can't be skipped: each needs the previous one to have succeeded on the
+server, and every installer form carries a security token.
+
+## 4. After installing
+
+- Sign in with the administrator email and password.
+- **Admin → Users**: create accounts for staff (Staff or Production role).
+  Each new user receives a one-time temporary password and must choose their
+  own at first sign-in.
+- The installer is locked: any visit shows "already installed" (HTTP 403)
+  and can't change anything. Deleting only `storage/install.lock` does not
+  reopen it either, because `config/config.php` also records the
+  installation. For extra tidiness you may delete `public/install/`.
+- Set up backups (BACKUP.md) and HTTPS (SECURITY.md).
 
 ## Troubleshooting
 
-| Symptom | Likely cause | Fix |
+| Symptom | Cause | Fix |
 |---|---|---|
-| Your domain shows a folder listing, your host's default page, or a "LP-System-…" folder instead of the installer | The ZIP was extracted into a subfolder, or a default `index.html` is still there | Make sure `index.php` sits directly in `public_html/` (see "Uploading the files") and delete any `index.html` |
-| The home page loads but `/install/`, `/login` or the CSS give "Not Found" | The `.htaccess` files are missing (hidden files weren't uploaded) or the host has URL rewriting turned off | Turn on "Show Hidden Files" and confirm `public_html/.htaccess` and `public_html/public/.htaccess` exist; if they do, ask your host to enable `mod_rewrite` / `.htaccess` overrides |
-| Pages work but have no styling and links point to the wrong place | The site was installed in a subfolder (`yourdomain.com/lp/`) | Install at the root of a domain or a subdomain instead |
-| Requirements check fails on a folder | Wrong permissions | Set the folder to 755 via File Manager |
-| "Could not connect" on the database step | Wrong host/user/password, or the DB user lacks privileges | Double-check cPanel → MySQL Databases; re-grant ALL PRIVILEGES |
-| Blank white page anywhere | A PHP fatal error occurred and was logged, not shown (by design — see SECURITY.md) | Check `storage/logs/php-error.log` and `storage/logs/app.log` via File Manager |
-| "LP System is already installed" but you need to reinstall | The installer locked itself | Delete `storage/install.lock` via FTP/File Manager, then revisit `/install/`. This does **not** delete any data — it just re-opens the wizard, which itself never drops existing tables. |
-| Installer stopped partway (e.g. browser closed) | No partial state is saved until the final "Finish" step | Just start again from step 1 — nothing was written to disk yet, this is the designed recovery path. |
+| Folder listing, host default page, or an extra "LP-System…" folder | Extracted one level too deep, or `index.html` still present | Move the contents up so `index.php` is directly in the site folder; delete `index.html` |
+| Requirements: "URL rewriting … not working" | `.htaccess` files missing, or the host ignores them | Upload hidden files; ask the host to enable `mod_rewrite` / `AllowOverride` |
+| Requirements: "could not be verified" | The server blocks requests to itself | Usually harmless; if `/login` later says Not Found, see the row above |
+| Requirements: folder not writable | Permissions | Set the folder to 755 (or 775) |
+| "does not exist, or the user … has not been given access" | Database name typo (include the cPanel prefix), or user not added to the database | cPanel → MySQL Databases → Add User To Database → ALL PRIVILEGES |
+| "username or password is incorrect" | Wrong database credentials | Re-type them; reset the DB user's password in cPanel if unsure |
+| "contains a users table from a different application" | The database belongs to another app (e.g. WordPress) | Create a new, empty database for LP System |
+| Generic "Something went wrong" page with a reference code | An error was logged, not shown (by design) | Look up the reference in `storage/logs/php-error.log` |
+| "Update in progress" after uploading a new release | Database updates are pending | An administrator signs in and applies them (UPGRADE.md) |
 
-## Recovery: resuming an interrupted install
+## Interrupted installation
 
-Steps 1–6 only hold their data in your PHP session, not on disk. If your
-browser closes or the connection drops before you reach step 7 ("Finish"),
-nothing has been written to `config/config.php` or locked — tables may
-have already been created by step 4 (harmless; step 4 is idempotent), but
-simply reload `/install/` and start again. The installer will skip
-table creation if it detects the tables already exist and let you proceed
-straight to creating your admin account.
+Steps 1–5 only keep their data in the installer session (the administrator
+password is kept only as a bcrypt hash). If the browser closes, start again:
+tables created in step 4 are detected and kept, and step 4 only adds what's
+missing. Nothing is locked until **Finish** succeeds.
+
+## Reinstalling over an existing LP System database
+
+If you point a fresh copy of the files at a database that already holds LP
+System data, step 3 tells you so and asks you to tick a confirmation box.
+Nothing is deleted. Missing tables and pending updates are applied, your
+existing records stay, and you create an additional administrator. An
+administrator email that already exists can't be reused. This is the
+recovery path when `config/config.php` is lost but the database is intact.

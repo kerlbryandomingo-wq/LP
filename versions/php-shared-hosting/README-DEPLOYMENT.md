@@ -1,87 +1,71 @@
 # LP System — PHP / MySQL Shared-Hosting Edition
 
-This is an independent PHP/MySQL port of LP System, built to run on standard
-cPanel-style shared hosting with **no Node.js, no PostgreSQL, no Docker, no
-SSH/root access, and no Composer required**.
+An independent PHP/MySQL version of LP System for ordinary cPanel-style
+shared hosting: **no Node.js, no PostgreSQL, no Docker, no SSH/root access,
+no Composer**. It is installed from the browser, like WordPress. You never
+edit PHP files or create database tables by hand.
 
-It was ported from the original Next.js/Prisma/PostgreSQL application living
-at the repository root. **That original application is untouched** — this
-is a separate, independently deployable codebase under
-`versions/php-shared-hosting/`.
-
-Read **FEATURE-PARITY.md** before relying on this for production — it lists
-exactly what has been ported and tested, and what has not.
+It was ported from the original Next.js/Prisma/PostgreSQL application at the
+repository root, which is untouched. This edition covers the core staff
+workflow only. **Read FEATURE-PARITY.md before relying on it**: it lists
+exactly what is included, and what isn't (for example the customer portal,
+customer forms, statements of account, expenses/costing, email and
+Messenger).
 
 ## Requirements
 
-- PHP 8.0 or newer (tested on 8.3) with these extensions: `pdo_mysql`,
-  `mbstring`, `json`, `fileinfo`, `session`. `gd` is optional.
-- MySQL 5.7+ or MariaDB 10.3+ (InnoDB).
-- Apache with `mod_rewrite` (standard on cPanel hosts) or LiteSpeed, which
-  reads the same `.htaccess` files. nginx needs the rules in SECURITY.md.
-- The site must live at the **root of a domain or subdomain**
-  (`https://yourdomain.com/` or `https://lp.yourdomain.com/`), not in a
-  subfolder such as `https://yourdomain.com/lp/` — the app's links and
-  redirects are root-relative.
-- No Composer, no `vendor/` directory, no shell access. There are zero
-  third-party packages.
+- PHP 8.0 or newer (tested on 8.3) with `pdo_mysql`, `mbstring`, `json`,
+  `fileinfo`, `session`, `ctype`, `filter`. `gd` is optional.
+- MySQL 5.7.8+ or MariaDB 10.3+ (tested on MariaDB 10.11), InnoDB.
+- Apache with `mod_rewrite` and `.htaccess` overrides (standard on cPanel),
+  or LiteSpeed, which reads the same `.htaccess` files. For nginx, see
+  SECURITY.md.
+- HTTPS strongly recommended (free AutoSSL / Let's Encrypt on most hosts).
+
+## Where it can live
+
+All three layouts were installed and tested end-to-end:
+
+| You upload the ZIP's contents into… | Site address | Notes |
+|---|---|---|
+| `public_html/` | `https://yourdomain.com/` | Most common |
+| `public_html/lpsystem/` (any folder name) | `https://yourdomain.com/lpsystem/` | Links, redirects and cookies follow the folder automatically |
+| any folder, with the domain's document root set to its `public/` | `https://lp.yourdomain.com/` | Optional; for hosts that let you choose the document root |
 
 ## What's in the ZIP
 
-The ZIP's files sit directly at its root — extract it straight into your web
-root (`public_html/`) and `index.php` lands where your host expects it:
+The files sit directly at the ZIP's root:
 
 ```
-public_html/                 <- extract the ZIP here
-├── index.php                <- entry point
-├── .htaccess                <- routes every request into public/, blocks everything else
-├── public/                  <- the actual web-facing part
-│   ├── index.php            <- front controller
-│   ├── install/             <- browser installer (locks itself after use)
-│   ├── assets/              <- CSS / JS
-│   └── uploads/             <- public, non-sensitive files only
-├── app/                     <- PHP source — never served directly
-├── config/                  <- config.php is written here by the installer — never served directly
-├── database/                <- SQL migrations + seed data — never served directly
-├── storage/                 <- logs, cache, private uploads — never served directly
-├── tests/                   <- test scripts — never served directly
-└── *.md                     <- documentation — never served directly
+index.php        entry point (forwards to public/)
+.htaccess        routes every request into public/, blocks everything else
+public/          the only web-facing part: front controller, installer, CSS/JS
+app/             PHP source           — never served
+config/          config.php is written here by the installer — never served
+database/        migrations + seed data — never served
+storage/         logs, cache, private uploads — never served
+*.md             documentation        — never served
 ```
-
-Every request is internally rewritten into `public/`, so `app/`, `config/`,
-`database/`, `storage/`, `tests/` and the docs can't be downloaded even
-though they sit inside `public_html/` (verified on a real Apache server —
-see TESTING.md section 6). Each of those folders also has its own deny-all
-`.htaccess` as a second layer.
-
-**If your host lets you choose the document root**, you can instead point it
-at the `public/` folder; the root `index.php` and `.htaccess` are then
-simply unused. Both setups were tested.
 
 ## Quick start (cPanel)
 
-1. In cPanel → **MySQL Databases**, create a database and a user, and add
-   the user to the database with **ALL PRIVILEGES**. Note the database
-   name, username and password (the host is almost always `localhost`).
-2. In cPanel → **File Manager**, open `public_html/`, upload
-   `LP-System-PHP-Shared-Hosting.zip`, right-click it → **Extract**. You
-   should now see `index.php`, `public/`, `app/` etc. directly inside
-   `public_html/`. (Turn on "Show Hidden Files" in File Manager settings to
-   see the `.htaccess` files.) You can delete the ZIP afterwards.
-3. Visit your domain. A fresh install redirects you to `/install/`
-   automatically.
-4. Follow the wizard: requirements check → database credentials → create
-   tables → admin account → site settings → finish.
-5. The installer locks itself (`storage/install.lock`). As an extra
-   precaution you can then delete `public/install/` — see INSTALL.md.
+1. cPanel → **MySQL Databases**: create a database and a user, then add the
+   user to the database with **ALL PRIVILEGES**. Note the names and password.
+2. cPanel → **File Manager**: open `public_html/` (or a new folder inside
+   it), upload `LP-System-PHP-Shared-Hosting-Verified.zip`, right-click →
+   **Extract** into that same folder, then delete the ZIP.
+3. Visit the site. You are sent to the installer automatically.
+4. Follow the six steps: requirements → database → create tables →
+   administrator → site settings → finish.
+5. Sign in, then add staff accounts under **Admin → Users**.
 
-## Support documents
+Details and troubleshooting: **INSTALL.md**.
 
-- **INSTALL.md** — detailed installer walkthrough + troubleshooting.
-- **UPGRADE.md** — how to update to a newer release without data loss.
-- **BACKUP.md** — what to back up and how to restore it.
-- **SECURITY.md** — the security model and hosting-specific notes
-  (including nginx rules).
-- **FEATURE-PARITY.md** — what's implemented and tested, what isn't, and why.
-- **TESTING.md** — exactly what was tested in this release, how, and the
-  results.
+## Documents
+
+- **INSTALL.md**: installation walkthrough and troubleshooting
+- **UPGRADE.md**: installing a newer release without losing data
+- **BACKUP.md**: what to back up and how to restore
+- **SECURITY.md**: security model, roles, hosting notes
+- **FEATURE-PARITY.md**: what is and isn't ported from the original app
+- **TESTING.md**: how this release was tested, and how to repeat it
